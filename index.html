@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Jogo da Forca</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(to bottom, #1e3c72, #2a5298);
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      background: rgba(0,0,0,0.4);
+      padding: 30px;
+      border-radius: 15px;
+      max-width: 500px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+
+    h1 {
+      margin: 10px 0 25px;
+      color: #ffeb3b;
+      text-shadow: 2px 2px 4px #000;
+    }
+
+    #forca {
+      font-family: monospace;
+      font-size: 1.1rem;
+      white-space: pre;
+      background: #111;
+      padding: 15px;
+      border-radius: 10px;
+      margin: 20px auto;
+      min-height: 220px;
+      color: #0f0;
+    }
+
+    #palavra {
+      font-size: 2.8rem;
+      letter-spacing: 8px;
+      margin: 30px 0;
+      min-height: 60px;
+      font-weight: bold;
+    }
+
+    #letras-usadas {
+      margin: 20px 0;
+      font-size: 1.1rem;
+    }
+
+    .letra {
+      display: inline-block;
+      width: 38px;
+      height: 38px;
+      line-height: 38px;
+      margin: 5px;
+      background: #333;
+      border-radius: 8px;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s;
+    }
+
+    .letra:hover {
+      background: #555;
+      transform: scale(1.1);
+    }
+
+    .letra.usada {
+      background: #555;
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .letra.certa {
+      background: #4caf50 !important;
+      color: white;
+    }
+
+    .letra.errada {
+      background: #f44336 !important;
+      color: white;
+    }
+
+    #mensagem {
+      font-size: 1.6rem;
+      margin: 25px 0;
+      min-height: 60px;
+    }
+
+    button {
+      background: #ff9800;
+      color: white;
+      border: none;
+      padding: 14px 30px;
+      font-size: 1.2rem;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 15px 8px;
+      transition: 0.3s;
+    }
+
+    button:hover {
+      background: #ffb74d;
+      transform: translateY(-2px);
+    }
+
+    #tentativas {
+      font-size: 1.3rem;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Jogo da Forca</h1>
+
+  <pre id="forca"></pre>
+
+  <div id="palavra"></div>
+
+  <div id="tentativas">Tentativas restantes: 7</div>
+
+  <div id="letras-usadas">Letras usadas: —</div>
+
+  <div id="teclado"></div>
+
+  <div id="mensagem"></div>
+
+  <button id="novo-jogo" style="display:none;">Jogar Novamente</button>
+</div>
+
+<script>
+// =============================================
+
+const palavras = [
+  "PYTHON", "JAVASCRIPT", "COMPUTADOR", "PROGRAMACAO", "ALGORITMO",
+  "INTELIGENCIA", "ARTIFICIAL", "FORCA", "ENFORCADO", "BRASIL",
+  "SAMBA", "CAIPIRINHA", "AMAZONIA", "PRAIA", "MONTANHA",
+  "GUITARRA", "TECLADO", "VIOLAO", "BATERIA", "MICROFONE",
+  "DINOSSAURO", "GALAXIA", "PLANETA", "ASTRONAUTA", "FOGUETE",
+  "CHOCOLATE", "SORVETE", "PIZZA", "HAMBURGUER", "BATATA",
+  "Futebol", "BASQUETE", "VOLEI", "NATACAO", "CORRIDA"
+];
+
+const forcaEstagios = [
+`      _______
+      |/      
+      |      
+      |      
+      |      
+      |      
+    _|_     `,
+
+`      _______
+      |/    |
+      |     O
+      |      
+      |      
+      |      
+    _|_     `,
+
+`      _______
+      |/    |
+      |     O
+      |     |
+      |     |
+      |      
+    _|_     `,
+
+`      _______
+      |/    |
+      |     O
+      |    /|
+      |     |
+      |      
+    _|_     `,
+
+`      _______
+      |/    |
+      |     O
+      |    /|\\
+      |     |
+      |      
+    _|_     `,
+
+`      _______
+      |/    |
+      |     O
+      |    /|\\
+      |     |
+      |    / 
+    _|_     `,
+
+`      _______
+      |/    |
+      |     O
+      |    /|\\
+      |     |
+      |    / \\
+    _|_     `,
+
+`           O    <─ caiu!
+          /|\\
+          / \\
+     ____/   \\____
+    /               \\
+    |   ENFORCADO    |
+    \\________________/`
+];
+
+let palavraSecreta = "";
+let palavraDisplay = [];
+let letrasUsadas = new Set();
+let tentativasRestantes = 7;
+let jogoAcabou = false;
+
+// Elementos
+const elForca = document.getElementById("forca");
+const elPalavra = document.getElementById("palavra");
+const elTentativas = document.getElementById("tentativas");
+const elLetrasUsadas = document.getElementById("letras-usadas");
+const elMensagem = document.getElementById("mensagem");
+const elTeclado = document.getElementById("teclado");
+const btnNovoJogo = document.getElementById("novo-jogo");
+
+// Cria teclado virtual
+function criarTeclado() {
+  elTeclado.innerHTML = "";
+  const letras = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+  letras.forEach(letra => {
+    const btn = document.createElement("div");
+    btn.className = "letra";
+    btn.textContent = letra;
+    btn.addEventListener("click", () => tentarLetra(letra));
+    elTeclado.appendChild(btn);
+  });
+}
+
+function iniciarJogo() {
+  // Escolhe palavra
+  palavraSecreta = palavras[Math.floor(Math.random() * palavras.length)];
+  palavraDisplay = Array(palavraSecreta.length).fill("_");
+  letrasUsadas.clear();
+  tentativasRestantes = 7;
+  jogoAcabou = false;
+
+  elPalavra.textContent = palavraDisplay.join(" ");
+  elTentativas.textContent = `Tentativas restantes: ${tentativasRestantes}`;
+  elLetrasUsadas.textContent = "Letras usadas: —";
+  elMensagem.textContent = "";
+  elForca.textContent = forcaEstagios[0];
+  btnNovoJogo.style.display = "none";
+
+  // Reset teclado
+  document.querySelectorAll(".letra").forEach(el => {
+    el.className = "letra";
+  });
+}
+
+function tentarLetra(letra) {
+  if (jogoAcabou || letrasUsadas.has(letra)) return;
+
+  letrasUsadas.add(letra);
+  const btn = [...document.querySelectorAll(".letra")].find(el => el.textContent === letra);
+  if (btn) btn.classList.add("usada");
+
+  if (palavraSecreta.includes(letra)) {
+    // Acertou
+    for (let i = 0; i < palavraSecreta.length; i++) {
+      if (palavraSecreta[i] === letra) {
+        palavraDisplay[i] = letra;
+      }
+    }
+    elPalavra.textContent = palavraDisplay.join(" ");
+
+    if (!palavraDisplay.includes("_")) {
+      finalizarJogo(true);
+    }
+  } else {
+    // Errou
+    tentativasRestantes--;
+    elTentativas.textContent = `Tentativas restantes: ${tentativasRestantes}`;
+    elForca.textContent = forcaEstagios[7 - tentativasRestantes];
+
+    if (tentativasRestantes === 0) {
+      finalizarJogo(false);
+    }
+  }
+
+  atualizarLetrasUsadas();
+}
+
+function atualizarLetrasUsadas() {
+  if (letrasUsadas.size === 0) {
+    elLetrasUsadas.textContent = "Letras usadas: —";
+  } else {
+    elLetrasUsadas.textContent = "Letras usadas: " + [...letrasUsadas].sort().join(" ");
+  }
+}
+
+function finalizarJogo(venceu) {
+  jogoAcabou = true;
+  btnNovoJogo.style.display = "inline-block";
+
+  if (venceu) {
+    elMensagem.innerHTML = `<span style="color:#4caf50">PARABÉNS! Você venceu!</span><br>A palavra era: ${palavraSecreta}`;
+    elForca.textContent = forcaEstagios[0]; // limpa forca
+  } else {
+    elMensagem.innerHTML = `<span style="color:#f44336">GAME OVER</span><br>A palavra era: ${palavraSecreta}`;
+  }
+
+  // Revela todas as letras
+  elPalavra.textContent = palavraSecreta.split("").join(" ");
+}
+
+// Eventos
+btnNovoJogo.addEventListener("click", iniciarJogo);
+
+// Inicia
+criarTeclado();
+iniciarJogo();
+
+</script>
+</body>
+</html>
